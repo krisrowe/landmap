@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Land Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3b2d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="map"></div>
+
+<div id="toolbar">
+  <button id="btn-locate" title="Show where I am">Locate</button>
+  <button id="btn-pin" class="primary" title="Pin the spot I am standing on">Pin here</button>
+  <button id="btn-offline" title="Save map tiles for offline use">Offline map</button>
+</div>
+<div id="status" hidden></div>
+
+<div id="sheet" hidden>
+  <form id="pin-form">
+    <h2 id="sheet-title">New pin</h2>
+    <p id="sheet-fix" class="muted"></p>
+    <label>Label <input id="pin-label" name="label" maxlength="120" required autocomplete="off"></label>
+    <label>Note <textarea id="pin-note" name="note" rows="2" maxlength="2000"></textarea></label>
+    <div class="row">
+      <button type="button" id="pin-cancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</div>
+
+<script src="/static/vendor/leaflet/leaflet.js" crossorigin=""></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

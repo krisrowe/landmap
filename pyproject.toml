@@ -1,0 +1,27 @@
+[project]
+name = "landmap"
+version = "0.1.0"
+description = "Property boundary map with GPS place tagging"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+browser = ["playwright>=1.45"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["landmap*"]
+
+[tool.setuptools.package-data]
+landmap = ["static/*", "static/vendor/leaflet/*", "static/vendor/leaflet/images/*", "*.kml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--ignore=tests/browser"

@@ -1,0 +1,42 @@
+:root { --bg: #1f3b2d; --fg: #f4f1e8; --accent: #e0a82e; --muted: #9bb3a4; }
+html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #111; color: var(--fg); }
+#map { position: absolute; inset: 0; }
+#toolbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1000;
+  display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(31, 59, 45, 0.92); backdrop-filter: blur(6px);
+}
+#toolbar button, #sheet button {
+  flex: 1; padding: 14px 10px; font-size: 16px; border: 0; border-radius: 10px;
+  background: #2f5440; color: var(--fg); cursor: pointer;
+}
+#toolbar button.primary, #sheet button.primary { background: var(--accent); color: #221a05; font-weight: 600; }
+#toolbar button.active { outline: 2px solid var(--accent); }
+#toolbar button:disabled { opacity: 0.5; }
+#status {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+  max-width: 90vw; padding: 8px 14px; border-radius: 999px; font-size: 14px;
+  background: rgba(0,0,0,0.75); color: var(--fg);
+}
+#sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100;
+  background: var(--bg); color: var(--fg); border-radius: 16px 16px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+#sheet h2 { margin: 0 0 4px; font-size: 18px; }
+#sheet label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
+#sheet input, #sheet textarea {
+  width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; border-radius: 8px;
+  border: 1px solid #3f6a52; background: #142a1f; color: var(--fg);
+}
+#sheet .row { display: flex; gap: 8px; margin-top: 14px; }
+.muted { color: var(--muted); font-size: 13px; margin: 0; }
+.pin-label { background: rgba(31,59,45,0.9); color: var(--fg); border: 0; border-radius: 6px; padding: 2px 6px; font-weight: 600; box-shadow: none; }
+.pin-label::before { display: none; }
+.pin-label.pending { background: rgba(224,168,46,0.9); color: #221a05; }
+.popup-actions { display: flex; gap: 6px; margin-top: 8px; }
+.popup-actions button { flex: 1; padding: 8px; border: 0; border-radius: 6px; background: #2f5440; color: var(--fg); cursor: pointer; }
+.popup-actions button.danger { background: #7a2e2e; }
+.leaflet-popup-content { margin: 10px 12px; }
+.leaflet-popup-content-wrapper { background: #1f3b2d; color: #f4f1e8; }
+.leaflet-popup-tip { background: #1f3b2d; }

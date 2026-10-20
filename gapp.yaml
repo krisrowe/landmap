@@ -1,0 +1,11 @@
+service:
+  entrypoint: landmap.server:app
+public: true
+env:
+- name: LANDMAP_DATA_PATH
+  value: '{{SOLUTION_DATA_PATH}}'
+- name: LANDMAP_ACCESS_KEY
+  secret:
+    name: access-key
+    generate: true
+name: landmap
