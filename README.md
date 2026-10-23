@@ -40,8 +40,7 @@ the definition names but the folder lacks, and prints the extent.
 
 ## What it does
 
-- Draws every layer of the property definition over satellite imagery (streets
-  as an alternative): surveyed tracts, section lines, water, drives, structures,
+- Draws every layer of the property definition over satellite imagery: surveyed tracts, section lines, water, drives, structures,
   plans, traced boundaries, scanned maps. Each is a checkbox under Layers in
   the menu, on or off as the definition says, and choices stick on the device.
 - The map stays on the land: you can pull back for regional perspective and
@@ -57,7 +56,7 @@ the definition names but the folder lacks, and prints the extent.
 - **Offline map** (in the menu) pre-downloads the imagery tiles around the
   boundary so the map still renders without cell signal; pins made offline
   queue in the browser and sync when a connection returns.
-- The menu also holds Sign in / Sign out and the Satellite / Streets switch.
+- The menu opens on the layer list; Offline map and Sign in / Sign out sit below it.
 - Installable as a home-screen app (web manifest + service worker).
 
 ## Run locally

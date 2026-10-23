@@ -11,7 +11,7 @@
   const READABLE_ZOOM = 14;        // below this the property is a speck and Home lights up
   const REGION_LAT = 0.2;          // about 14 miles north and south of the property
   const REGION_LNG = 0.25;         // about 14 miles east and west
-  const OFFLINE_MAX_TILES = 600;
+  const OFFLINE_MAX_TILES = 3000;   // ~90 MB of imagery at most
 
   const $ = (id) => document.getElementById(id);
   const statusEl = $("status");
@@ -76,12 +76,9 @@
   const imagery = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     { maxZoom: 19, attribution: "Imagery &copy; Esri" });
-  const streets = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" });
 
   const map = L.map("map", { layers: [imagery], zoomControl: false, attributionControl: true, maxBoundsViscosity: 1.0 });
   L.control.scale({ imperial: true, metric: true }).addTo(map);
-  let streetsOn = false;
 
   const pinLayer = L.layerGroup().addTo(map);
   const markers = new Map(); // pin id -> marker
@@ -236,6 +233,10 @@
     doc.layers.forEach((layer) => {
       const group = buildLayer(layer);
       layerGroups.set(layer.id, group);
+      // The property's extent is what is there by default. Optional layers (a
+      // recorded drive, a regional scan) can reach far beyond the land and must
+      // not stretch Home, the region, or the offline area.
+      if (!layer.default) return;
       layer.features.features.forEach((f) => {
         if (!f.geometry) return;
         const c = f.geometry.coordinates;
@@ -460,10 +461,12 @@
   $("menu-offline").addEventListener("click", async () => {
     closeMenu();
     if (!("caches" in window)) { showStatus("Offline caching not supported here"); return; }
-    const area = (propertyBounds && propertyBounds.isValid() ? propertyBounds : map.getBounds()).pad(0.5);
+    // Always the whole property with a margin, never the current view: the point
+    // is to have the land when the signal is gone.
+    const area = (propertyBounds && propertyBounds.isValid() ? propertyBounds : map.getBounds()).pad(0.25);
     let urls = [];
     OFFLINE_ZOOMS.forEach((z) => { urls = urls.concat(tileRange(area, z)); });
-    if (urls.length > OFFLINE_MAX_TILES) { showStatus(`Area too large (${urls.length} tiles); zoom in first`); return; }
+    if (urls.length > OFFLINE_MAX_TILES) { showStatus(`The property spans ${urls.length} tiles, more than the ${OFFLINE_MAX_TILES} this can save`); return; }
     const cache = await caches.open("landmap-tiles");
     let done = 0, failed = 0;
     showStatus(`Saving tiles 0/${urls.length}`, true);
@@ -490,13 +493,6 @@
   function closeMenu() { $("menu").hidden = true; }
   $("btn-menu").addEventListener("click", () => { $("menu").hidden = !$("menu").hidden; });
   map.on("click", closeMenu);
-  $("menu-layer").addEventListener("click", () => {
-    streetsOn = !streetsOn;
-    if (streetsOn) { map.removeLayer(imagery); streets.addTo(map); } else { map.removeLayer(streets); imagery.addTo(map); }
-    $("menu-layer").textContent = streetsOn ? "Satellite" : "Streets";
-    closeMenu();
-  });
-  $("menu-layers-toggle").addEventListener("click", () => { $("menu-layers").hidden = !$("menu-layers").hidden; });
   $("menu-signin").addEventListener("click", () => {
     closeMenu();
     $("signin-key").value = "";

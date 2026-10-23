@@ -1,11 +1,11 @@
 /* Service worker: cache the app shell and map tiles so the map works on the property without signal. */
-const SHELL_CACHE = "landmap-shell-v3";
+const SHELL_CACHE = "landmap-shell-v4";
 const TILE_CACHE = "landmap-tiles";
 const SHELL = [
   "/", "/static/app.js", "/static/style.css", "/static/manifest.webmanifest", "/static/icon.svg",
   "/static/vendor/leaflet/leaflet.css", "/static/vendor/leaflet/leaflet.js",
 ];
-const TILE_HOSTS = ["server.arcgisonline.com", "tile.openstreetmap.org"];
+const TILE_HOSTS = ["server.arcgisonline.com"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

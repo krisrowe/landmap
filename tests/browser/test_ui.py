@@ -57,7 +57,6 @@ def page(server):
                                   viewport={"width": 420, "height": 800}, is_mobile=True, has_touch=True)
         # Map tiles come from the internet; keep the test hermetic and fast.
         ctx.route("**/arcgisonline.com/**", lambda r: r.abort())
-        ctx.route("**/openstreetmap.org/**", lambda r: r.abort())
         pg = ctx.new_page()
         pg.on("dialog", lambda d: d.accept())   # confirm() on delete; no prompt() exists any more
         yield pg
@@ -71,7 +70,7 @@ def test_map_is_public_and_pins_need_sign_in(server, page):
     assert page.is_hidden("#menu")                                      # closed until the icon is tapped
     assert page.is_hidden("#btn-pin")
     assert page.evaluate("document.querySelectorAll('.map-label').length") >= 3   # labels from the property definition
-    page.click("#btn-menu"); page.click("#menu-layers-toggle")
+    page.click("#btn-menu")
     assert page.evaluate("document.querySelectorAll('#menu-layers input').length") >= 9
     page.click("#btn-menu")
     assert page.is_hidden("#signin-sheet")
@@ -144,7 +143,6 @@ def test_map_stays_on_the_property(server, page):
     """Desktop context: mouse drags pan the map here; the phone emulation swallows them."""
     desk = page.context.browser.new_context(viewport={"width": 900, "height": 700})
     desk.route("**/arcgisonline.com/**", lambda r: r.abort())
-    desk.route("**/openstreetmap.org/**", lambda r: r.abort())
     pg = desk.new_page()
     try:
         pg.goto(server + "/")
@@ -183,7 +181,6 @@ def test_locate_far_from_the_property_stays_put(server, page):
     far = page.context.browser.new_context(geolocation={"latitude": 37.75, "longitude": -97.60, "accuracy": 5.0},
                                            permissions=["geolocation"], viewport={"width": 420, "height": 800})
     far.route("**/arcgisonline.com/**", lambda r: r.abort())
-    far.route("**/openstreetmap.org/**", lambda r: r.abort())
     pg = far.new_page()
     try:
         pg.goto(server + "/?key=" + KEY)
