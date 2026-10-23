@@ -31,13 +31,17 @@ def test_boundary_parses_bundled_kml():
     assert box["south"] < box["north"] and box["west"] < box["east"]
 
 
-def test_api_requires_key(client):
-    assert client.get("/api/pins").status_code == 401
-    assert client.get("/api/pins", headers={"x-access-key": "wrong"}).status_code == 401
-    assert client.get("/api/pins", params={"key": KEY}).status_code == 200
+def test_boundary_is_public_and_pins_are_keyed(client):
+    assert client.get("/api/boundary").status_code == 200
+    assert client.get("/").status_code == 200
     assert client.get("/healthz").status_code == 200
     assert client.get("/health").status_code == 200
-    assert client.get("/").status_code == 200
+    assert client.get("/api/session").status_code == 401
+    assert client.get("/api/pins").status_code == 401
+    assert client.get("/api/pins", headers={"x-access-key": "wrong"}).status_code == 401
+    assert client.post("/api/pins", json={"label": "x", "lat": 1, "lng": 1}).status_code == 401
+    assert client.get("/api/session", headers=h()).status_code == 200
+    assert client.get("/api/pins", params={"key": KEY}).status_code == 200
 
 
 def test_open_mode_when_no_key(tmp_path):

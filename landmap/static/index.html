@@ -14,12 +14,31 @@
 <body>
 <div id="map"></div>
 
+<button id="btn-menu" aria-label="Menu" title="Menu">&#9776;</button>
+<div id="menu" hidden>
+  <button id="menu-signin">Sign in</button>
+  <button id="menu-signout" hidden>Sign out</button>
+  <button id="menu-layer">Streets</button>
+  <button id="menu-offline" title="Save map tiles for offline use">Offline map</button>
+</div>
+
 <div id="toolbar">
   <button id="btn-locate" title="Show where I am">Locate</button>
-  <button id="btn-pin" class="primary" title="Pin the spot I am standing on">Pin here</button>
-  <button id="btn-offline" title="Save map tiles for offline use">Offline map</button>
+  <button id="btn-pin" class="primary" title="Pin the spot I am standing on" hidden>Pin here</button>
 </div>
 <div id="status" hidden></div>
+
+<div id="signin-sheet" hidden>
+  <form id="signin-form">
+    <h2>Sign in</h2>
+    <p class="muted">Pins are private. Enter the access key to see and edit them.</p>
+    <label>Access key <input id="signin-key" type="password" autocomplete="current-password" required></label>
+    <div class="row">
+      <button type="button" id="signin-cancel">Cancel</button>
+      <button type="submit" class="primary">Sign in</button>
+    </div>
+  </form>
+</div>
 
 <div id="sheet" hidden>
   <form id="pin-form">

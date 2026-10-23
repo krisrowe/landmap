@@ -1,5 +1,5 @@
 /* Service worker: cache the app shell and map tiles so the map works on the property without signal. */
-const SHELL_CACHE = "landmap-shell-v1";
+const SHELL_CACHE = "landmap-shell-v2";
 const TILE_CACHE = "landmap-tiles";
 const SHELL = [
   "/", "/static/app.js", "/static/style.css", "/static/manifest.webmanifest", "/static/icon.svg",
@@ -27,8 +27,10 @@ self.addEventListener("fetch", (event) => {
     // Network first; fall back to the last good copy so the boundary and pins still show offline.
     event.respondWith(
       fetch(event.request).then((res) => {
-        const copy = res.clone();
-        caches.open(SHELL_CACHE).then((c) => c.put(event.request, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(SHELL_CACHE).then((c) => c.put(event.request, copy));
+        }
         return res;
       }).catch(() => caches.match(event.request))
     );

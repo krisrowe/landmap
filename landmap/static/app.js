@@ -24,20 +24,48 @@
   function getKey() { try { return localStorage.getItem(KEY_STORAGE) || ""; } catch (e) { return ""; } }
   function setKey(k) { try { localStorage.setItem(KEY_STORAGE, k); } catch (e) { /* private mode */ } }
 
-  async function api(path, opts, retried) {
+  function clearKey() { try { localStorage.removeItem(KEY_STORAGE); } catch (e) { /* ignore */ } }
+
+  // A key in the link (shared once, saved to the home screen) is stored and removed from the address bar.
+  (function adoptKeyFromLink() {
+    const params = new URLSearchParams(window.location.search);
+    const linked = params.get("key");
+    if (linked) {
+      setKey(linked.trim());
+      params.delete("key");
+      const rest = params.toString();
+      history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : "") + window.location.hash);
+    }
+  })();
+
+  async function api(path, opts) {
     opts = opts || {};
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
     const key = getKey();
     if (key) headers["X-Access-Key"] = key;
     const res = await fetch(path, Object.assign({}, opts, { headers }));
-    if (res.status === 401 && !retried) {
-      const entered = window.prompt("Enter the Land Map access key");
-      if (entered === null) throw new Error("access key required");
-      setKey(entered.trim());
-      return api(path, opts, true);
+    if (res.status === 401) {
+      setSignedIn(false);
+      throw new Error("signed out");
     }
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.status === 204 ? null : res.json();
+  }
+
+  // ---- Session (signed in = holds a key the server accepts) -----------------
+  let signedIn = false;
+  function setSignedIn(value) {
+    signedIn = value;
+    $("btn-pin").hidden = !value;
+    $("menu-signin").hidden = value;
+    $("menu-signout").hidden = !value;
+    if (!value) { pinLayer.clearLayers(); markers.clear(); }
+  }
+
+  async function checkSession() {
+    if (!getKey()) { setSignedIn(false); return false; }
+    try { await api("/api/session"); setSignedIn(true); return true; }
+    catch (e) { return false; }
   }
 
   // ---- Map -----------------------------------------------------------------
@@ -47,9 +75,9 @@
   const streets = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" });
 
-  const map = L.map("map", { layers: [imagery], zoomControl: true, attributionControl: true });
-  L.control.layers({ "Satellite": imagery, "Streets": streets }, null, { position: "topright" }).addTo(map);
+  const map = L.map("map", { layers: [imagery], zoomControl: false, attributionControl: true });
   L.control.scale({ imperial: true, metric: true }).addTo(map);
+  let streetsOn = false;
 
   let boundaryBounds = null;
   const pinLayer = L.layerGroup().addTo(map);
@@ -136,6 +164,7 @@
   }
 
   async function loadPins() {
+    if (!signedIn) return;
     const pins = await api("/api/pins");
     pins.forEach((t) => renderPin(t, false));
     readQueue().forEach((t) => renderPin(t, true));
@@ -290,7 +319,8 @@
     return urls;
   }
 
-  $("btn-offline").addEventListener("click", async () => {
+  $("menu-offline").addEventListener("click", async () => {
+    closeMenu();
     if (!("caches" in window)) { showStatus("Offline caching not supported here"); return; }
     const area = (boundaryBounds && boundaryBounds.isValid() ? boundaryBounds : map.getBounds()).pad(0.5);
     let urls = [];
@@ -312,17 +342,51 @@
     showStatus(`Offline map ready: ${urls.length - failed} tiles saved${failed ? `, ${failed} failed` : ""}`);
   });
 
+  // ---- Menu ------------------------------------------------------------------
+  function closeMenu() { $("menu").hidden = true; }
+  $("btn-menu").addEventListener("click", () => { $("menu").hidden = !$("menu").hidden; });
+  map.on("click", closeMenu);
+  $("menu-layer").addEventListener("click", () => {
+    streetsOn = !streetsOn;
+    if (streetsOn) { map.removeLayer(imagery); streets.addTo(map); } else { map.removeLayer(streets); imagery.addTo(map); }
+    $("menu-layer").textContent = streetsOn ? "Satellite" : "Streets";
+    closeMenu();
+  });
+  $("menu-signin").addEventListener("click", () => {
+    closeMenu();
+    $("signin-key").value = "";
+    $("signin-sheet").hidden = false;
+    setTimeout(() => $("signin-key").focus(), 50);
+  });
+  $("menu-signout").addEventListener("click", () => {
+    closeMenu();
+    clearKey();
+    setSignedIn(false);
+    showStatus("Signed out");
+  });
+  $("signin-cancel").addEventListener("click", () => { $("signin-sheet").hidden = true; });
+  $("signin-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setKey($("signin-key").value.trim());
+    $("signin-sheet").hidden = true;
+    if (await checkSession()) { await loadPins(); flushQueue(); showStatus("Signed in"); }
+    else { clearKey(); showStatus("That key was not accepted"); }
+  });
+
   // ---- Boot ------------------------------------------------------------------
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js", { scope: "/" }).catch(() => {});
 
   (async () => {
     try {
       await loadBoundary();
-      await loadPins();
-      flushQueue();
     } catch (err) {
-      showStatus("Could not load map data: " + err.message, true);
+      showStatus("Could not load the map: " + err.message, true);
       map.setView([0, 0], 2);
+    }
+    try {
+      if (await checkSession()) { await loadPins(); flushQueue(); }
+    } catch (err) {
+      showStatus("Could not load pins: " + err.message);
     }
   })();
 })();

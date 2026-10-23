@@ -2,7 +2,7 @@
 
 Configuration comes from the environment:
   LANDMAP_DATA_PATH   directory for pins.json (default ./data)
-  LANDMAP_ACCESS_KEY  shared key required on every /api call; unset = open
+  LANDMAP_ACCESS_KEY  key required to read or change pins; unset = open
   LANDMAP_KML         boundary KML to serve (default the bundled one)
 """
 
@@ -60,7 +60,12 @@ def create_app(data_path: Path | None = None, access_key: str | None = None,
     def healthz():
         return {"ok": True}
 
-    @app.get("/api/boundary", dependencies=guarded)
+    @app.get("/api/session", dependencies=guarded)
+    def session():
+        """Succeeds only with a valid key; the page uses it to decide whether to show pins."""
+        return {"ok": True}
+
+    @app.get("/api/boundary")
     def get_boundary():
         return {"boundary": boundary, "bounds": bounds(boundary)}
 

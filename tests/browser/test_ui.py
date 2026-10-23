@@ -59,14 +59,39 @@ def page(server):
         ctx.route("**/arcgisonline.com/**", lambda r: r.abort())
         ctx.route("**/openstreetmap.org/**", lambda r: r.abort())
         pg = ctx.new_page()
-        pg.on("dialog", lambda d: d.accept(KEY) if d.type == "prompt" else d.accept())
+        pg.on("dialog", lambda d: d.accept())   # confirm() on delete; no prompt() exists any more
         yield pg
         browser.close()
 
 
-def test_boundary_and_gps_pinning(server, page):
+def test_map_is_public_and_pins_need_sign_in(server, page):
     page.goto(server + "/")
+    page.wait_for_selector("path.leaflet-interactive", timeout=15000)   # boundary draws without a key
+    page.screenshot(path=str(SHOT_DIR / "landmap-public.png"))
+    assert page.is_hidden("#btn-pin")
+    assert page.is_hidden("#signin-sheet")
+    page.click("#btn-menu")
+    assert page.is_visible("#menu-signin")
+    page.click("#menu-signin")
+    page.fill("#signin-key", "not-the-key")
+    page.click("#signin-form button[type=submit]")
+    page.wait_for_function("document.querySelector('#status').textContent.includes('not accepted')", timeout=10000)
+    assert page.is_hidden("#btn-pin")
+    page.click("#btn-menu")
+    page.click("#menu-signin")
+    page.fill("#signin-key", KEY)
+    page.click("#signin-form button[type=submit]")
+    page.wait_for_selector("#btn-pin:not([hidden])", timeout=10000)
+    page.click("#btn-menu")
+    page.click("#menu-signout")
+    page.wait_for_selector("#btn-pin", state="hidden", timeout=10000)
+
+
+def test_boundary_and_gps_pinning(server, page):
+    page.goto(server + "/?key=" + KEY)                                  # the link saved to the home screen
     page.wait_for_selector("path.leaflet-interactive", timeout=15000)   # boundary polygon drawn
+    page.wait_for_selector("#btn-pin:not([hidden])", timeout=15000)     # key adopted, signed in
+    assert "key=" not in page.url                                       # and scrubbed from the address bar
 
     page.click("#btn-pin")
     page.wait_for_selector("#sheet:not([hidden])", timeout=15000)
@@ -84,8 +109,8 @@ def test_boundary_and_gps_pinning(server, page):
 
     page.screenshot(path=str(SHOT_DIR / "landmap-pinned.png"))
 
-    # Survives a reload (comes back from the server, not the queue). Locate pans to the fix,
-    # which is where the pin is, so the marker is on screen for the popup steps.
+    # Survives a reload (the stored key signs in silently; pins come from the server, not the queue).
+    # Locate pans to the fix, which is where the pin is, so the marker is on screen for the popup steps.
     page.reload()
     page.wait_for_selector(".pin-label:not(.pending)", timeout=15000)
     page.click("#btn-locate")
