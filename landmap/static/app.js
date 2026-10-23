@@ -179,7 +179,7 @@
 
   function labelIcon(props) {
     const text = (legalOn && props.legalText) ? props.legalText : props.text;
-    const size = { "x-large": "20px", large: "16px", medium: "14px", "12pt": "16px", small: "12px" }[props.size] || "16px";
+    const size = { "x-large": "17px", large: "14px", medium: "12px", "12pt": "13px", small: "11px" }[props.size] || "14px";
     return L.divIcon({ className: "map-label" + (props.anchor ? " anchor-" + props.anchor : ""),
                        html: `<div style="color:${props.color || "#fff"};--label-px:${size}">${text}</div>`, iconSize: null });
   }

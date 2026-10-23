@@ -1,5 +1,5 @@
 /* Service worker: cache the app shell and map tiles so the map works on the property without signal. */
-const SHELL_CACHE = "landmap-shell-v8";
+const SHELL_CACHE = "landmap-shell-v9";
 const TILE_CACHE = "landmap-tiles";
 const SHELL = [
   "/", "/static/app.js", "/static/style.css", "/static/manifest.webmanifest", "/static/icon.svg",
