@@ -36,6 +36,7 @@ def test_api_requires_key(client):
     assert client.get("/api/pins", headers={"x-access-key": "wrong"}).status_code == 401
     assert client.get("/api/pins", params={"key": KEY}).status_code == 200
     assert client.get("/healthz").status_code == 200
+    assert client.get("/health").status_code == 200
     assert client.get("/").status_code == 200
 
 

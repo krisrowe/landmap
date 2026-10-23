@@ -55,6 +55,7 @@ def create_app(data_path: Path | None = None, access_key: str | None = None,
 
     guarded = [Depends(require_key)]
 
+    @app.get("/health")
     @app.get("/healthz")
     def healthz():
         return {"ok": True}

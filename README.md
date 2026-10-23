@@ -49,7 +49,7 @@ Tests: `pytest`.
 | POST | `/api/pins` | `{label, lat, lng, accuracy?, note?}` |
 | PATCH | `/api/pins/{id}` | any of `label, note, lat, lng` |
 | DELETE | `/api/pins/{id}` | |
-| GET | `/healthz` | liveness |
+| GET | `/health`, `/healthz` | liveness |
 
 ## Deploy
 
