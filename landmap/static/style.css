@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 :root { --bg: #1f3b2d; --fg: #f4f1e8; --accent: #e0a82e; --muted: #9bb3a4; }
 html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #111; color: var(--fg); }
 #map { position: absolute; inset: 0; }

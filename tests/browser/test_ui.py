@@ -68,10 +68,14 @@ def test_map_is_public_and_pins_need_sign_in(server, page):
     page.goto(server + "/")
     page.wait_for_selector("path.leaflet-interactive", timeout=15000)   # boundary draws without a key
     page.screenshot(path=str(SHOT_DIR / "landmap-public.png"))
+    assert page.is_hidden("#menu")                                      # closed until the icon is tapped
     assert page.is_hidden("#btn-pin")
     assert page.is_hidden("#signin-sheet")
     page.click("#btn-menu")
     assert page.is_visible("#menu-signin")
+    page.click("#btn-menu")
+    assert page.is_hidden("#menu")                                      # icon toggles it closed
+    page.click("#btn-menu")
     page.click("#menu-signin")
     page.fill("#signin-key", "not-the-key")
     page.click("#signin-form button[type=submit]")

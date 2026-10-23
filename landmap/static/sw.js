@@ -1,5 +1,5 @@
 /* Service worker: cache the app shell and map tiles so the map works on the property without signal. */
-const SHELL_CACHE = "landmap-shell-v2";
+const SHELL_CACHE = "landmap-shell-v3";
 const TILE_CACHE = "landmap-tiles";
 const SHELL = [
   "/", "/static/app.js", "/static/style.css", "/static/manifest.webmanifest", "/static/icon.svg",
@@ -45,13 +45,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // App shell: network first so a connected browser always gets the current version;
+  // the cached copy is the fallback for use on the property without signal.
   event.respondWith(
-    caches.match(event.request).then((hit) => hit || fetch(event.request).then((res) => {
+    fetch(event.request).then((res) => {
       if (res.ok && url.origin === self.location.origin) {
         const copy = res.clone();
         caches.open(SHELL_CACHE).then((c) => c.put(event.request, copy));
       }
       return res;
-    }))
+    }).catch(() => caches.match(event.request))
   );
 });
