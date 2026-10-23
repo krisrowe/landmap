@@ -17,7 +17,7 @@ import pytest
 playwright = pytest.importorskip("playwright.sync_api")
 
 KEY = "browser-" + "k" * 8
-FIX = {"latitude": 45.1000, "longitude": -100.5000, "accuracy": 3.0}
+FIX = {"latitude": 38.7600, "longitude": -97.5850, "accuracy": 3.0}   # a mile or so from the example property, inside the region
 SHOT_DIR = Path(os.environ.get("LANDMAP_SHOT_DIR", "/tmp"))
 
 
@@ -66,10 +66,14 @@ def page(server):
 
 def test_map_is_public_and_pins_need_sign_in(server, page):
     page.goto(server + "/")
-    page.wait_for_selector("path.leaflet-interactive", timeout=15000)   # boundary draws without a key
+    page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)   # property layers draw without a key
     page.screenshot(path=str(SHOT_DIR / "landmap-public.png"))
     assert page.is_hidden("#menu")                                      # closed until the icon is tapped
     assert page.is_hidden("#btn-pin")
+    assert page.evaluate("document.querySelectorAll('.map-label').length") >= 3   # labels from the property definition
+    page.click("#btn-menu"); page.click("#menu-layers-toggle")
+    assert page.evaluate("document.querySelectorAll('#menu-layers input').length") >= 9
+    page.click("#btn-menu")
     assert page.is_hidden("#signin-sheet")
     page.click("#btn-menu")
     assert page.is_visible("#menu-signin")
@@ -93,13 +97,13 @@ def test_map_is_public_and_pins_need_sign_in(server, page):
 
 def test_boundary_and_gps_pinning(server, page):
     page.goto(server + "/?key=" + KEY)                                  # the link saved to the home screen
-    page.wait_for_selector("path.leaflet-interactive", timeout=15000)   # boundary polygon drawn
+    page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)   # property layers drawn
     page.wait_for_selector("#btn-pin:not([hidden])", timeout=15000)     # key adopted, signed in
     assert "key=" not in page.url                                       # and scrubbed from the address bar
 
     page.click("#btn-pin")
     page.wait_for_selector("#sheet:not([hidden])", timeout=15000)
-    assert "45.100000" in page.text_content("#sheet-fix")
+    assert f"{FIX['latitude']:.6f}" in page.text_content("#sheet-fix")
     page.fill("#pin-label", "NE corner pin")
     page.fill("#pin-note", "orange flag")
     page.click("#pin-form button[type=submit]")
@@ -136,9 +140,60 @@ def test_boundary_and_gps_pinning(server, page):
     assert httpx.get(server + "/api/pins", headers={"x-access-key": KEY}).json() == []
 
 
+def test_map_stays_on_the_property(server, page):
+    """Desktop context: mouse drags pan the map here; the phone emulation swallows them."""
+    desk = page.context.browser.new_context(viewport={"width": 900, "height": 700})
+    desk.route("**/arcgisonline.com/**", lambda r: r.abort())
+    desk.route("**/openstreetmap.org/**", lambda r: r.abort())
+    pg = desk.new_page()
+    try:
+        pg.goto(server + "/")
+        pg.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
+        assert not pg.evaluate("document.querySelector('#btn-home').classList.contains('away')")
+        # Drag off the property: Home lights up; tapping it brings the property back.
+        for _ in range(8):
+            pg.mouse.move(450, 200); pg.mouse.down(); pg.mouse.move(450, 650, steps=8); pg.mouse.up()
+            pg.wait_for_timeout(150)
+        pg.wait_for_function("document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
+        pg.click("#btn-home")
+        pg.wait_for_function("!document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
+        # Zooming far out for perspective also lights Home; the floor keeps the region, not the world.
+        pg.mouse.move(450, 350)
+        for _ in range(12):
+            pg.mouse.wheel(0, 600)
+            pg.wait_for_timeout(150)
+        pg.wait_for_function("document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
+        assert pg.evaluate("document.querySelectorAll('.leaflet-overlay-pane path').length") > 0   # still the region, not the world
+        pg.click("#btn-home")
+        pg.wait_for_function("!document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
+    finally:
+        desk.close()
+
+
 def test_locate_shows_position(server, page):
     page.goto(server + "/")
-    page.wait_for_selector("path.leaflet-interactive", timeout=15000)
+    page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
     page.click("#btn-locate")
     page.wait_for_selector("path[stroke='#1e88e5']", timeout=15000)   # position dot drawn
     assert "active" in page.get_attribute("#btn-locate", "class")
+
+
+def test_locate_far_from_the_property_stays_put(server, page):
+    """Seventy miles away, Locate must not fly to the neighborhood you're standing in."""
+    far = page.context.browser.new_context(geolocation={"latitude": 37.75, "longitude": -97.60, "accuracy": 5.0},
+                                           permissions=["geolocation"], viewport={"width": 420, "height": 800})
+    far.route("**/arcgisonline.com/**", lambda r: r.abort())
+    far.route("**/openstreetmap.org/**", lambda r: r.abort())
+    pg = far.new_page()
+    try:
+        pg.goto(server + "/?key=" + KEY)
+        pg.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
+        pg.click("#btn-locate")
+        pg.wait_for_function("document.querySelector('#status').textContent.includes('mi south of the property')", timeout=15000)
+        assert not pg.evaluate("document.querySelector('#btn-home').classList.contains('away')")   # still on the land
+        assert pg.evaluate("document.querySelectorAll('.map-label').length") >= 3
+        pg.click("#btn-pin")
+        pg.wait_for_function("document.querySelector('#status').textContent.includes('pins are for when')", timeout=20000)
+        assert pg.is_hidden("#sheet")
+    finally:
+        far.close()

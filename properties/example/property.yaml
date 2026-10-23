@@ -1,0 +1,139 @@
+# Example property: a surveyed 40-acre square with the usual things a landowner
+# maps around it. It is fictional and sits on open prairie. Copy it as the
+# starting point for your own definition; landmap/resolver.py turns this data
+# into map layers. Distances are feet, bearings are degrees clockwise from north.
+
+name: Example 40
+center: forty_center
+zoom: 16
+
+constants:
+  # Surveyed side lengths and bearings of the 40 (a plat gives you these).
+  north_len: 1318.2
+  east_len: 1321.5
+  south_len: 1319.0
+  west_len: 1320.8
+  north_brg: 89.96
+  east_brg: 180.04
+  south_brg: -89.98
+  west_brg: 0.03
+  chain: 330          # 5 chains = 330 ft; a 40 is roughly 4 chains square
+
+points:
+  # One known corner anchors everything else. Nudge it with `moves` if the
+  # recorded corner sits off the road centre line.
+  section_nw: {lat: 38.7540000, lng: -97.6020000}
+  forty_nw: {from: section_nw, moves: [["north_brg", "north_len"]]}
+  forty_center: {center: forty}
+  home: {from: forty_nw, moves: [[180, 600], [90, 420]]}
+  clearing_center: {center: clearing}
+
+layers:
+  - id: forty
+    name: 40 acres
+    default: true
+    features:
+      - id: forty
+        type: traverse
+        start: forty_nw
+        legs: [["north_brg", "north_len"], ["east_brg", "east_len"], ["south_brg", "south_len"], ["west_brg", "west_len"]]
+        style: {color: "#ffff00", weight: 2, opacity: 0.8}
+      - type: quadrants
+        of: forty
+        depth: 1
+        style: {color: "#ffff00", weight: 2, opacity: 0.4}
+      - type: label
+        at: forty_center
+        text: 40 acres
+        legal_text: 40 acres<br><br>NE/4, NW/4
+        style: {color: "#ffff00", size: large}
+
+  - id: section
+    name: Section
+    default: true
+    features:
+      - type: traverse
+        start: section_nw
+        legs: [["north_brg", "north_len * 4"], ["east_brg", "east_len * 4"], ["south_brg", "south_len * 4"], ["west_brg", "west_len * 4"]]
+        style: {color: "#FF99FF", weight: 2, opacity: 0.8}
+
+  - id: legal
+    name: Legal
+    default: true
+    features:
+      - type: label
+        at: {from: section_nw, moves: [[180, 60], [90, 140]]}
+        text: Section 1 (T 1N R 1W)<br>Example County
+        style: {color: "#FF99FF", size: x-large}
+
+  - id: pond
+    name: Pond
+    default: true
+    features:
+      - type: traverse
+        start: {from: forty_nw, moves: [[180, 900], [90, 700]]}
+        legs: [[120, 60], [170, 80], [230, 70], [290, 60], [340, 50], [20, 70]]
+        close: true
+        style: {color: blue, weight: 2, opacity: 1, fill: lightblue, fillOpacity: 0.5}
+      - type: label
+        at: {from: forty_nw, moves: [[180, 960], [90, 690]]}
+        text: Pond
+        style: {color: lightblue, size: medium}
+
+  - id: drive
+    name: Driveway
+    default: true
+    features:
+      - type: traverse
+        start: {from: forty_nw, moves: [[90, 60]]}
+        legs: [[175, 200], [160, 150], [140, 120], [110, 100]]
+        style: {color: "#d3d3d3", weight: 4, opacity: 0.8}
+
+  - id: house
+    name: House
+    default: false
+    features:
+      - type: rect
+        center: home
+        width: 60
+        height: 40
+        close: true
+        style: {color: gray, weight: 0.5, opacity: 1, fill: gray, fillOpacity: 0.5}
+
+  # A plan is something you might build: off by default so the map shows what is there.
+  - id: plan
+    name: Plan
+    default: false
+    features:
+      - id: clearing
+        type: square
+        nw: home
+        acres: 2
+        shift: [[0, "side(2) / 2"]]
+        style: {color: LawnGreen, weight: 2, opacity: 0.8}
+      - type: label
+        at: clearing_center
+        text: Clearing
+        style: {color: LawnGreen, size: 12pt}
+      - type: traverse                      # fence line
+        start: {from: forty_nw, moves: [[180, 16], [90, 16]]}
+        legs: [[180, "chain * 4 - 32"], [90, "chain * 4 - 32"]]
+        style: {color: gray, weight: 4, opacity: 0.8, dash: "4 12"}
+
+  # Overlays are files next to the definition: traced boundaries and GPS tracks as
+  # KML, scanned maps as images placed by two corners.
+  - id: traced
+    name: Traced boundary
+    default: false
+    features:
+      - {type: kml, file: overlays/traced-boundary.kml, style: {color: "#fbc02d", weight: 3, opacity: 0.9, fill: "#ffffff", fillOpacity: 0.05}}
+
+  - id: soil
+    name: Soil map
+    default: false
+    features:
+      - type: image
+        file: overlays/soil-map.png
+        sw: {from: forty_nw, moves: [[180, "west_len + 100"], [270, 100]]}
+        ne: {from: forty_nw, moves: [[0, 100], [90, "north_len + 100"]]}
+        opacity: 0.4

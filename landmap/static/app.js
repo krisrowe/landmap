@@ -7,6 +7,10 @@
   const FIX_WINDOW_MS = 6000;      // how long "Pin here" listens for GPS readings
   const GOOD_ENOUGH_M = 5;         // stop early once a reading is this accurate
   const OFFLINE_ZOOMS = [14, 15, 16, 17, 18];
+  const MIN_ZOOM = 10;             // regional perspective; no further
+  const READABLE_ZOOM = 14;        // below this the property is a speck and Home lights up
+  const REGION_LAT = 0.2;          // about 14 miles north and south of the property
+  const REGION_LNG = 0.25;         // about 14 miles east and west
   const OFFLINE_MAX_TILES = 600;
 
   const $ = (id) => document.getElementById(id);
@@ -75,11 +79,10 @@
   const streets = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" });
 
-  const map = L.map("map", { layers: [imagery], zoomControl: false, attributionControl: true });
+  const map = L.map("map", { layers: [imagery], zoomControl: false, attributionControl: true, maxBoundsViscosity: 1.0 });
   L.control.scale({ imperial: true, metric: true }).addTo(map);
   let streetsOn = false;
 
-  let boundaryBounds = null;
   const pinLayer = L.layerGroup().addTo(map);
   const markers = new Map(); // pin id -> marker
 
@@ -155,11 +158,114 @@
     markers.delete(id);
   }
 
-  async function loadBoundary() {
-    const data = await api("/api/boundary");
-    const layer = L.geoJSON(data.boundary, { style: { color: "#fbc02d", weight: 3, fillColor: "#ffffff", fillOpacity: 0.08 } }).addTo(map);
-    boundaryBounds = layer.getBounds();
-    if (boundaryBounds.isValid()) map.fitBounds(boundaryBounds.pad(0.15));
+  // ---- Property layers ----------------------------------------------------------
+  const LAYER_STORAGE = "landmap.layers";
+  const layerGroups = new Map();   // layer id -> L.LayerGroup
+  let propertyBounds = null;
+  let legalOn = true;
+
+  function readLayerChoices() { try { return JSON.parse(localStorage.getItem(LAYER_STORAGE) || "{}"); } catch (e) { return {}; } }
+  function writeLayerChoice(id, on) { const c = readLayerChoices(); c[id] = on; try { localStorage.setItem(LAYER_STORAGE, JSON.stringify(c)); } catch (e) { /* ignore */ } }
+
+  function labelIcon(props) {
+    const text = (legalOn && props.legalText) ? props.legalText : props.text;
+    const size = { "x-large": "20px", large: "16px", medium: "14px", "12pt": "16px", small: "12px" }[props.size] || "16px";
+    return L.divIcon({ className: "map-label", html: `<div style="color:${props.color || "#fff"};font-size:${size}">${text}</div>`, iconSize: null });
+  }
+
+  function featureStyle(p) {
+    return { color: p.color || "#fff", weight: p.weight == null ? 2 : p.weight, opacity: p.opacity == null ? 0.8 : p.opacity,
+             fillColor: p.fill || p.color || "#fff", fillOpacity: p.fillOpacity == null ? 0 : p.fillOpacity,
+             dashArray: p.dash || null, interactive: false };
+  }
+
+  function buildLayer(layer) {
+    const group = L.layerGroup();
+    layer.features.features.forEach((f) => {
+      const p = f.properties || {};
+      if (p.kind === "image") {
+        const b = p.bounds;
+        group.addLayer(L.imageOverlay(`/overlays/${p.image.replace(/^overlays\//, "")}`, [[b.south, b.west], [b.north, b.east]], { opacity: p.opacity, interactive: false }));
+      } else if (p.kind === "label") {
+        const m = L.marker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { icon: labelIcon(p), interactive: false });
+        m.labelProps = p;
+        group.addLayer(m);
+      } else if (f.geometry) {
+        group.addLayer(L.geoJSON(f, { style: () => featureStyle(p), pointToLayer: (_, ll) => L.circleMarker(ll, { radius: 5, ...featureStyle(p), fillOpacity: 0.9 }) }));
+      }
+    });
+    return group;
+  }
+
+  function setLayer(id, on) {
+    const group = layerGroups.get(id);
+    if (!group) return;
+    if (on) group.addTo(map); else map.removeLayer(group);
+    if (id === "legal") {
+      legalOn = on;
+      layerGroups.forEach((g) => g.eachLayer((l) => { if (l.labelProps) l.setIcon(labelIcon(l.labelProps)); }));
+    }
+  }
+
+  function renderLayerMenu(layers) {
+    const list = $("menu-layers");
+    list.innerHTML = "";
+    const choices = readLayerChoices();
+    layers.forEach((layer) => {
+      const on = layer.id in choices ? choices[layer.id] : layer.default;
+      const row = document.createElement("label");
+      row.className = "layer-row";
+      const box = document.createElement("input");
+      box.type = "checkbox"; box.checked = on;
+      box.addEventListener("change", () => { setLayer(layer.id, box.checked); writeLayerChoice(layer.id, box.checked); });
+      row.appendChild(box);
+      row.appendChild(document.createTextNode(" " + layer.name));
+      list.appendChild(row);
+      if (layer.id === "legal") legalOn = on;
+    });
+  }
+
+  async function loadProperty() {
+    const doc = await api("/api/property");
+    propertyDoc = doc;
+    document.title = doc.name;
+    if (doc.example) showStatus("Showing the example property: no definition in the data directory yet.", true);
+    renderLayerMenu(doc.layers);
+    const choices = readLayerChoices();
+    const all = [];
+    doc.layers.forEach((layer) => {
+      const group = buildLayer(layer);
+      layerGroups.set(layer.id, group);
+      layer.features.features.forEach((f) => {
+        if (!f.geometry) return;
+        const c = f.geometry.coordinates;
+        const pts = f.geometry.type === "Point" ? [c] : f.geometry.type === "Polygon" ? c[0] : c;
+        pts.forEach(([lng, lat]) => all.push([lat, lng]));
+      });
+    });
+    doc.layers.forEach((layer) => setLayer(layer.id, layer.id in choices ? choices[layer.id] : layer.default));
+    propertyBounds = all.length ? L.latLngBounds(all) : null;
+    if (propertyBounds) {
+      // The map is about this property: you can pull back for perspective on the
+      // region, but not leave it, and Home lights up whenever the property is out
+      // of view or too small to read.
+      const c = propertyBounds.getCenter();
+      map.setMaxBounds(L.latLngBounds([c.lat - REGION_LAT, c.lng - REGION_LNG], [c.lat + REGION_LAT, c.lng + REGION_LNG]));
+      map.setMinZoom(MIN_ZOOM);
+      map.on("moveend zoomend", updateHomeState);
+    }
+    goHome(doc);
+  }
+
+  function updateHomeState() {
+    if (!propertyBounds) return;
+    const away = !map.getBounds().intersects(propertyBounds) || map.getZoom() < READABLE_ZOOM;
+    $("btn-home").classList.toggle("away", away);
+  }
+
+  function goHome(doc) {
+    if (doc && doc.center) map.setView([doc.center.lat, doc.center.lng], doc.zoom || 16);
+    else if (propertyBounds) map.fitBounds(propertyBounds.pad(0.1));
     else map.setView([0, 0], 2);
   }
 
@@ -211,9 +317,34 @@
   let hereMarker = null, hereCircle = null, follow = false;
   let lastFix = null;
 
+  function insideRegion(lat, lng) {
+    const region = map.options.maxBounds;
+    return !region || region.contains([lat, lng]);
+  }
+  function milesFromProperty(lat, lng) {
+    return propertyBounds ? map.distance([lat, lng], propertyBounds.getCenter()) / 1609.34 : 0;
+  }
+  function directionFromProperty(lat, lng) {
+    const c = propertyBounds.getCenter();
+    const dLng = (lng - c.lng) * Math.cos((lat + c.lat) / 2 * Math.PI / 180);
+    const deg = (Math.atan2(dLng, lat - c.lat) * 180 / Math.PI + 360) % 360;
+    return ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"][Math.round(deg / 45) % 8];
+  }
+  function farAwayMessage(lat, lng) {
+    return `You're ${Math.round(milesFromProperty(lat, lng))} mi ${directionFromProperty(lat, lng)} of the property, beyond what this map shows`;
+  }
+  let farNotified = false;
+
   function updateHere(pos) {
     const ll = [pos.coords.latitude, pos.coords.longitude];
     lastFix = pos;
+    if (!insideRegion(ll[0], ll[1])) {
+      // Far from the land (home, the road in): the map stays on the property.
+      if (!farNotified) { showStatus(farAwayMessage(ll[0], ll[1])); farNotified = true; }
+      follow = false; $("btn-locate").classList.remove("active");
+      return;
+    }
+    farNotified = false;
     if (!hereMarker) {
       hereMarker = L.circleMarker(ll, { radius: 8, color: "#fff", weight: 2, fillColor: "#1e88e5", fillOpacity: 1, interactive: false }).addTo(map);
       hereCircle = L.circle(ll, { radius: pos.coords.accuracy || 0, color: "#1e88e5", weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
@@ -236,8 +367,10 @@
     follow = !follow;
     $("btn-locate").classList.toggle("active", follow);
     startWatch();
-    if (follow && lastFix) map.setView([lastFix.coords.latitude, lastFix.coords.longitude], Math.max(map.getZoom(), 17));
-    showStatus(follow ? "Following your position" : "Stopped following");
+    if (follow && lastFix && insideRegion(lastFix.coords.latitude, lastFix.coords.longitude)) {
+      map.setView([lastFix.coords.latitude, lastFix.coords.longitude], Math.max(map.getZoom(), 17));
+    }
+    if (!(lastFix && !insideRegion(lastFix.coords.latitude, lastFix.coords.longitude))) showStatus(follow ? "Following your position" : "Stopped following");
   });
   map.on("dragstart", () => { if (follow) { follow = false; $("btn-locate").classList.remove("active"); } });
 
@@ -245,7 +378,8 @@
   function bestFix() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject(new Error("No GPS available"));
-      let best = null;
+      // Start from the fix Locate already has, if it is fresh; readings only improve on it.
+      let best = (lastFix && Date.now() - lastFix.timestamp < 15000) ? lastFix : null;
       const id = navigator.geolocation.watchPosition((pos) => {
         updateHere(pos);
         if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
@@ -266,6 +400,10 @@
       const fix = await bestFix();
       statusEl.hidden = true;
       const c = fix.coords;
+      if (!insideRegion(c.latitude, c.longitude)) {
+        showStatus(farAwayMessage(c.latitude, c.longitude) + "; pins are for when you're on the land");
+        return;
+      }
       openSheet({ title: "New pin", label: "", note: "", fix: `${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)} ${fmtAccuracy(c.accuracy)}` },
         (values) => savePin({ label: values.label, note: values.note, lat: c.latitude, lng: c.longitude, accuracy: c.accuracy }));
     } catch (err) {
@@ -322,7 +460,7 @@
   $("menu-offline").addEventListener("click", async () => {
     closeMenu();
     if (!("caches" in window)) { showStatus("Offline caching not supported here"); return; }
-    const area = (boundaryBounds && boundaryBounds.isValid() ? boundaryBounds : map.getBounds()).pad(0.5);
+    const area = (propertyBounds && propertyBounds.isValid() ? propertyBounds : map.getBounds()).pad(0.5);
     let urls = [];
     OFFLINE_ZOOMS.forEach((z) => { urls = urls.concat(tileRange(area, z)); });
     if (urls.length > OFFLINE_MAX_TILES) { showStatus(`Area too large (${urls.length} tiles); zoom in first`); return; }
@@ -342,6 +480,12 @@
     showStatus(`Offline map ready: ${urls.length - failed} tiles saved${failed ? `, ${failed} failed` : ""}`);
   });
 
+  let propertyDoc = null;
+  $("btn-home").addEventListener("click", () => {
+    follow = false; $("btn-locate").classList.remove("active");
+    goHome(propertyDoc);
+  });
+
   // ---- Menu ------------------------------------------------------------------
   function closeMenu() { $("menu").hidden = true; }
   $("btn-menu").addEventListener("click", () => { $("menu").hidden = !$("menu").hidden; });
@@ -352,6 +496,7 @@
     $("menu-layer").textContent = streetsOn ? "Satellite" : "Streets";
     closeMenu();
   });
+  $("menu-layers-toggle").addEventListener("click", () => { $("menu-layers").hidden = !$("menu-layers").hidden; });
   $("menu-signin").addEventListener("click", () => {
     closeMenu();
     $("signin-key").value = "";
@@ -374,11 +519,11 @@
   });
 
   // ---- Boot ------------------------------------------------------------------
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js", { scope: "/" }).catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 
   (async () => {
     try {
-      await loadBoundary();
+      await loadProperty();
     } catch (err) {
       showStatus("Could not load the map: " + err.message, true);
       map.setView([0, 0], 2);

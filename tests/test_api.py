@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from landmap.boundary import DEFAULT_KML, bounds, load_boundary
 from landmap.server import create_app
 
 KEY = "test-" + "k" * 12
@@ -19,20 +18,18 @@ def h():
     return {"x-access-key": KEY}
 
 
-def test_boundary_parses_bundled_kml():
-    fc = load_boundary(DEFAULT_KML)
-    assert fc["type"] == "FeatureCollection"
-    assert len(fc["features"]) == 1
-    ring = fc["features"][0]["geometry"]["coordinates"][0]
-    assert len(ring) == 5 and ring[0] == ring[-1]
-    lng, lat = ring[0]
-    assert -180 <= lng <= 180 and -90 <= lat <= 90
-    box = bounds(fc)
-    assert box["south"] < box["north"] and box["west"] < box["east"]
+def test_property_is_public_and_complete(client):
+    doc = client.get("/api/property").json()
+    assert doc["name"] == "Example 40" and doc["example"] is True and doc["zoom"] >= 14
+    ids = [l["id"] for l in doc["layers"]]
+    assert "forty" in ids and all(l["features"]["type"] == "FeatureCollection" for l in doc["layers"])
+    assert client.get("/overlays/traced-boundary.kml").status_code == 200
+    assert client.get("/overlays/../property.yaml").status_code in (404, 400)
+    assert client.get("/overlays/nope.kml").status_code == 404
 
 
 def test_boundary_is_public_and_pins_are_keyed(client):
-    assert client.get("/api/boundary").status_code == 200
+    assert client.get("/api/property").status_code == 200
     assert client.get("/").status_code == 200
     assert client.get("/healthz").status_code == 200
     assert client.get("/health").status_code == 200
@@ -81,3 +78,31 @@ def test_store_survives_new_app_instance(tmp_path):
     first.post("/api/pins", json={"label": "pond inlet", "lat": 45.2, "lng": -100.6})
     second = TestClient(create_app(data_path=tmp_path, access_key=""))
     assert [t["label"] for t in second.get("/api/pins").json()] == ["pond inlet"]
+
+
+def test_property_comes_from_the_data_directory_and_reloads(tmp_path: Path):
+    """A definition dropped into <data>/property replaces the example without a restart."""
+    import shutil, time
+    from landmap.data import EXAMPLE
+    data = tmp_path / "data"
+    client = TestClient(create_app(data_path=data, access_key=KEY))
+    assert client.get("/api/property").json()["example"] is True
+    shutil.copytree(EXAMPLE, data / "property")
+    spec = data / "property" / "property.yaml"
+    spec.write_text(spec.read_text().replace("name: Example 40", "name: Mine"))
+    doc = client.get("/api/property").json()
+    assert doc["name"] == "Mine" and doc["example"] is False
+    assert client.get("/overlays/traced-boundary.kml").status_code == 200
+    time.sleep(0.01)
+    spec.write_text(spec.read_text().replace("name: Mine", "name: Renamed"))
+    assert client.get("/api/property").json()["name"] == "Renamed"
+
+
+def test_property_override_wins(tmp_path: Path):
+    import shutil
+    from landmap.data import EXAMPLE
+    mine = tmp_path / "elsewhere"
+    shutil.copytree(EXAMPLE, mine)
+    (mine / "property.yaml").write_text((mine / "property.yaml").read_text().replace("name: Example 40", "name: Elsewhere"))
+    client = TestClient(create_app(data_path=tmp_path / "data", access_key=KEY, property_dir=mine))
+    assert client.get("/api/property").json()["name"] == "Elsewhere"

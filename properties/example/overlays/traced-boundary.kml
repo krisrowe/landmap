@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Traced boundary</name>
+<Placemark><name>40 acres (traced on foot)</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+-97.5973822,38.7539971,0 -97.5927563,38.7540094,0 -97.5927507,38.7503876,0 -97.5973773,38.7503744,0 -97.5973771,38.7539902,0 -97.5973822,38.7539971,0
+</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>

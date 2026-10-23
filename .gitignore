@@ -6,3 +6,6 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+# Real property data never lives in the tree (a local image build would ship it).
+properties/*
+!properties/example/

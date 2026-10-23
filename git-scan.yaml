@@ -1,0 +1,7 @@
+# Repo-level git-scan overrides (merged over the user's config).
+# KML exported from desktop GIS tools carries hex style ids that look like secrets to the entropy check.
+entropy:
+  exclusions:
+    - id: kml-managed-style-ids
+      file_glob: "*.kml"
+      content_pattern: '__managed_style_[0-9A-F]+'

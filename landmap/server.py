@@ -1,9 +1,9 @@
 """HTTP API and static front end for Land Map.
 
 Configuration comes from the environment:
-  LANDMAP_DATA_PATH   directory for pins.json (default ./data)
+  LANDMAP_DATA_PATH   the data directory (default ./data); see landmap/data.py
+  LANDMAP_PROPERTY    property definition directory, overriding <data>/property
   LANDMAP_ACCESS_KEY  key required to read or change pins; unset = open
-  LANDMAP_KML         boundary KML to serve (default the bundled one)
 """
 
 import os
@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .boundary import bounds, load_boundary
+from .data import PropertySource
 from .store import PinStore
 
 STATIC = Path(__file__).with_name("static")
@@ -37,13 +37,13 @@ class PinPatch(BaseModel):
 
 
 def create_app(data_path: Path | None = None, access_key: str | None = None,
-               kml_path: Path | None = None) -> FastAPI:
+               property_dir: Path | None = None) -> FastAPI:
     data_path = Path(data_path or os.environ.get("LANDMAP_DATA_PATH", "data"))
     access_key = access_key if access_key is not None else os.environ.get("LANDMAP_ACCESS_KEY", "")
-    kml_path = kml_path or (Path(os.environ["LANDMAP_KML"]) if os.environ.get("LANDMAP_KML") else None)
+    override = property_dir or os.environ.get("LANDMAP_PROPERTY")
 
     store = PinStore(data_path)
-    boundary = load_boundary(kml_path)
+    source = PropertySource(data_path, Path(override) if override else None)
     app = FastAPI(title="Land Map", docs_url=None, redoc_url=None)
 
     def require_key(request: Request) -> None:
@@ -65,9 +65,21 @@ def create_app(data_path: Path | None = None, access_key: str | None = None,
         """Succeeds only with a valid key; the page uses it to decide whether to show pins."""
         return {"ok": True}
 
-    @app.get("/api/boundary")
-    def get_boundary():
-        return {"boundary": boundary, "bounds": bounds(boundary)}
+    @app.get("/api/property")
+    def get_property():
+        """Name, center, and every layer as GeoJSON with its default visibility. Public.
+
+        Re-read when the definition file changes, so a property dropped onto the
+        data directory of a running server shows up on the next load."""
+        return source.document()
+
+    @app.get("/overlays/{name:path}")
+    def overlay(name: str):
+        """The current property's image and KML files. Public."""
+        path = source.overlay(name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="no such overlay")
+        return FileResponse(path)
 
     @app.get("/api/pins", dependencies=guarded)
     def list_pins():
@@ -95,6 +107,11 @@ def create_app(data_path: Path | None = None, access_key: str | None = None,
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/sw.js")
+    def service_worker():
+        # Served from the root so the worker may control the whole site.
+        return FileResponse(STATIC / "sw.js", media_type="application/javascript")
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

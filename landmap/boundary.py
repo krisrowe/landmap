@@ -1,10 +1,9 @@
-"""Read the property boundary from a KML file and expose it as GeoJSON."""
+"""Read KML (polygons, lines, points) and expose it as GeoJSON."""
 
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
-DEFAULT_KML = Path(__file__).with_name("boundary.kml")
 
 
 def _parse_coords(text: str) -> list[list[float]]:
@@ -18,14 +17,25 @@ def _parse_coords(text: str) -> list[list[float]]:
     return ring
 
 
-def load_boundary(path: Path | None = None) -> dict:
-    """Return a GeoJSON FeatureCollection of every polygon in the KML."""
-    path = Path(path) if path else DEFAULT_KML
+def load_kml(path: Path) -> dict:
+    """Return a GeoJSON FeatureCollection of every polygon, line, and point in the KML."""
     root = ET.parse(path).getroot()
     features = []
     for placemark in root.iter(f"{{{KML_NS['kml']}}}Placemark"):
         name_el = placemark.find("kml:name", KML_NS)
         name = (name_el.text or "").strip() if name_el is not None else ""
+        for ls in placemark.iter(f"{{{KML_NS['kml']}}}LineString"):
+            coords = ls.find("kml:coordinates", KML_NS)
+            if coords is not None and coords.text:
+                features.append({"type": "Feature", "properties": {"name": name},
+                                 "geometry": {"type": "LineString", "coordinates": _parse_coords(coords.text)}})
+        for pt in placemark.iter(f"{{{KML_NS['kml']}}}Point"):
+            coords = pt.find("kml:coordinates", KML_NS)
+            if coords is not None and coords.text:
+                parsed = _parse_coords(coords.text)
+                if parsed:
+                    features.append({"type": "Feature", "properties": {"name": name},
+                                     "geometry": {"type": "Point", "coordinates": parsed[0]}})
         for polygon in placemark.iter(f"{{{KML_NS['kml']}}}Polygon"):
             rings = []
             outer = polygon.find("kml:outerBoundaryIs/kml:LinearRing/kml:coordinates", KML_NS)
@@ -43,11 +53,20 @@ def load_boundary(path: Path | None = None) -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
+def load_boundary(path: Path) -> dict:
+    """Polygons only, from the given KML."""
+    fc = load_kml(Path(path))
+    fc["features"] = [f for f in fc["features"] if f["geometry"]["type"] == "Polygon"]
+    return fc
+
+
 def bounds(collection: dict) -> dict | None:
     """Bounding box of every ring, as {south, west, north, east}."""
     lngs, lats = [], []
     for feature in collection["features"]:
-        for ring in feature["geometry"]["coordinates"]:
+        geom = feature["geometry"]
+        rings = geom["coordinates"] if geom["type"] == "Polygon" else [geom["coordinates"]] if geom["type"] == "LineString" else [[geom["coordinates"]]]
+        for ring in rings:
             for lng, lat in ring:
                 lngs.append(lng)
                 lats.append(lat)
