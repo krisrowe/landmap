@@ -88,3 +88,23 @@ def test_layers_render_every_feature_kind():
 def test_unknown_reference_is_an_error():
     with pytest.raises(KeyError):
         Property({"points": {}, "layers": []}).point("nope")
+
+
+def test_label_in_a_shape_sits_inside_its_top_edge_centred():
+    spec = {
+        "points": {"nw": {"lat": 45.0, "lng": -100.0}},
+        "layers": [{"id": "l", "name": "L", "features": [
+            {"id": "sq", "type": "traverse", "start": "nw", "legs": [[90, 1000], [180, 1000], [270, 1000], [0, 1000]]},
+            {"type": "label", "in": "sq", "text": "Square"},
+            {"type": "label", "at": {"center": "sq"}, "text": "Middle"},
+        ]}],
+    }
+    p = Property(spec)
+    feats = p.layers()[0]["features"]["features"]
+    corner_label, center_label = feats[1], feats[2]
+    assert corner_label["properties"]["anchor"] == "n"
+    lng, lat = corner_label["geometry"]["coordinates"]
+    assert abs(lat - 45.0) < 1e-9                                                # on the top edge
+    assert -100.0 < lng < -99.99 and abs(lng - center_label["geometry"]["coordinates"][0]) < 1e-9   # at its middle
+    assert "anchor" not in center_label["properties"]
+    assert center_label["geometry"]["coordinates"][1] < 45.0                   # the centre is south of the corner

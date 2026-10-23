@@ -162,6 +162,7 @@ def test_map_stays_on_the_property(server, page):
             pg.wait_for_timeout(150)
         pg.wait_for_function("document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
         assert pg.evaluate("document.querySelectorAll('.leaflet-overlay-pane path').length") > 0   # still the region, not the world
+        assert pg.evaluate("getComputedStyle(document.querySelector('.map-label')).display") == "none"   # labels shrink away, never cover the land
         pg.click("#btn-home")
         pg.wait_for_function("!document.querySelector('#btn-home').classList.contains('away')", timeout=5000)
     finally:
@@ -201,8 +202,9 @@ def test_tap_a_spot_and_teleport_there(server, page):
     walking at home moves you around the land, survives a reload, and ends from the toolbar."""
     page.goto(server + "/")
     page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
-    page.mouse.click(210, 300)                                            # a spot on the land, off the centre label
+    page.mouse.click(210, 350)                                            # a spot inside the 40, off the labels
     page.wait_for_selector("#spot-sheet:not([hidden])", timeout=5000)
+    assert "40 acres" in page.text_content("#spot-in")                    # the sheet says what the spot is in
     assert page.is_hidden("#spot-pin") == page.is_hidden("#btn-pin")      # pinning offered only when signed in
     tapped = [float(v) for v in page.text_content("#spot-fix").split(",")]
     page.click("#spot-fix")                                               # the coordinates line copies itself

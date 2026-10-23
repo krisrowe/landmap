@@ -52,7 +52,8 @@ the definition names but the folder lacks, and prints the extent.
 - **Pin here** listens to the GPS for a few seconds, keeps the most accurate
   reading, and saves it with a label and optional note. Pins render as
   labeled markers; tap one to edit or delete it.
-- Tap anywhere on the map (click or right-click on a desktop) and it asks what you want there: **Pin here** (by
+- Tap anywhere on the map (click or right-click on a desktop) and it says which
+  tracts the spot is in and asks what you want there: **Pin here** (by
   hand, no GPS) or **Put me here**. Put me here anchors your real position to
   that spot: from then on every GPS reading is shifted by the same ground
   distance, so walking around your own neighborhood moves you around the land.

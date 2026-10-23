@@ -43,7 +43,7 @@ layers:
         depth: 1
         style: {color: "#ffff00", weight: 2, opacity: 0.4}
       - type: label
-        at: forty_center
+        in: forty              # centred inside the top edge, the way a plat labels a tract
         text: 40 acres
         legal_text: 40 acres<br><br>NE/4, NW/4
         style: {color: "#ffff00", size: large}

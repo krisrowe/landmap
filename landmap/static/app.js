@@ -180,8 +180,21 @@
   function labelIcon(props) {
     const text = (legalOn && props.legalText) ? props.legalText : props.text;
     const size = { "x-large": "20px", large: "16px", medium: "14px", "12pt": "16px", small: "12px" }[props.size] || "16px";
-    return L.divIcon({ className: "map-label", html: `<div style="color:${props.color || "#fff"};font-size:${size}">${text}</div>`, iconSize: null });
+    return L.divIcon({ className: "map-label" + (props.anchor ? " anchor-" + props.anchor : ""),
+                       html: `<div style="color:${props.color || "#fff"};--label-px:${size}">${text}</div>`, iconSize: null });
   }
+
+  // Labels are sized for the property at zoom 16 and shrink with the land as you
+  // pull back, so a big section label never covers the tract; below readable
+  // size they go away rather than overlap.
+  const LABEL_ZOOM = 16;
+  function scaleLabels() {
+    const scale = Math.min(1.5, Math.pow(2, map.getZoom() - LABEL_ZOOM));
+    map.getContainer().style.setProperty("--label-scale", scale.toFixed(3));
+    map.getContainer().classList.toggle("labels-hidden", scale < 0.45);
+  }
+  map.on("zoomend", scaleLabels);
+  scaleLabels();
 
   function featureStyle(p) {
     return { color: p.color || "#fff", weight: p.weight == null ? 2 : p.weight, opacity: p.opacity == null ? 0.8 : p.opacity,
@@ -487,8 +500,49 @@
 
   // Tap (or long-press) a spot on the map: pin it, or put yourself there.
   let spot = null;
+  // Which of the visible tracts and areas contain a point, smallest first.
+  function inside(ring, lat, lng) {
+    let hit = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) hit = !hit;
+    }
+    return hit;
+  }
+  function ringArea(ring) {
+    let a = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] + ring[i][0]) * (ring[j][1] - ring[i][1]);
+    return Math.abs(a / 2);
+  }
+  // A polygon, or a surveyed traverse that comes back to (nearly) its start: a
+  // tract boundary is drawn as a line, but it encloses land all the same.
+  function ringOf(geometry) {
+    if (!geometry) return null;
+    if (geometry.type === "Polygon") return geometry.coordinates[0];
+    if (geometry.type !== "LineString" || geometry.coordinates.length < 4) return null;
+    const pts = geometry.coordinates, a = pts[0], b = pts[pts.length - 1];
+    const closeEnough = map.distance([a[1], a[0]], [b[1], b[0]]) < 30;
+    return closeEnough ? pts : null;
+  }
+  function whatIsAt(latlng) {
+    if (!propertyDoc) return [];
+    const hits = [];
+    propertyDoc.layers.forEach((layer) => {
+      const group = layerGroups.get(layer.id);
+      if (!group || !map.hasLayer(group)) return;
+      layer.features.features.forEach((f) => {
+        const ring = ringOf(f.geometry);
+        if (ring && inside(ring, latlng.lat, latlng.lng)) hits.push({ name: layer.name, area: ringArea(ring) });
+      });
+    });
+    hits.sort((a, b) => a.area - b.area);
+    return [...new Set(hits.map((h) => h.name))];
+  }
+
   function openSpot(latlng) {
     spot = latlng;
+    const within = whatIsAt(latlng);
+    $("spot-in").textContent = within.length ? "In " + within.join(" · ") : "Outside every visible tract";
     $("spot-fix").textContent = `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
     $("spot-pin").hidden = !signedIn;
     $("spot-teleport").textContent = teleport ? "Move me here" : "Put me here";

@@ -61,7 +61,8 @@ Everything is survey language: feet and degrees clockwise from north.
 4. **Layers.** Each has `id`, `name`, `default` (on or off at first load)
    and `features`. Spec types: `traverse` (start plus legs), `points`,
    `square` (acres from a corner), `rect` (centered), `quadrants` of a shape,
-   `label` (with optional `legal_text` shown when the Legal layer is on),
+   `label` (at a point, or `in: <shape>` to sit centred inside its top edge
+   like a plat; optional `legal_text` shown when the Legal layer is on),
    `image` (file plus `sw`/`ne` corner points), `kml` (file). A feature with
    an `id` can be referenced by other points and shapes.
 5. **Overlays.** Files under `<data>/property/overlays/`, referenced as

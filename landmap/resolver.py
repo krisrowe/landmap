@@ -170,7 +170,13 @@ class Property:
         if "id" in feat:
             props["id"] = feat["id"]
         if kind == "label":
-            at = self.point(feat["at"])
+            if "in" in feat:
+                # The way a plat labels a tract: centred just inside its top edge.
+                sw, ne = bounds(self.shape(feat["in"]))
+                at = (ne[0], (sw[1] + ne[1]) / 2)
+                props["anchor"] = "n"
+            else:
+                at = self.point(feat["at"])
             props.update({"kind": "label", "text": feat["text"], "legalText": feat.get("legal_text")})
             return [{"type": "Feature", "properties": props,
                      "geometry": {"type": "Point", "coordinates": [at[1], at[0]]}}]
