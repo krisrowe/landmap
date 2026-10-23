@@ -62,7 +62,10 @@ html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Se
 #menu-layers { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; border-bottom: 1px solid rgba(255,255,255,0.15); margin-bottom: 4px; }
 .layer-row { font-size: 14px; padding: 6px 4px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
 .layer-row input { width: 18px; height: 18px; }
-.map-label { background: none; border: 0; font-weight: 600; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; line-height: 1.15; transform: translate(-50%, -50%); }
+/* Leaflet places the marker element with its own inline transform, so the
+   centring goes on the text element inside it, never on the marker itself. */
+.map-label { background: none; border: 0; font-weight: 600; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; line-height: 1.15; width: 0; height: 0; overflow: visible; }
+.map-label div { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); text-align: center; }
 #btn-home.away { background: var(--accent); color: #221a05; animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(224,168,46,0.7); } 50% { box-shadow: 0 0 0 10px rgba(224,168,46,0); } }
 #toolbar button.teleport { background: #5a3d8a; outline: 2px solid #b388ff; }
@@ -70,5 +73,5 @@ body.teleported path[stroke="#1e88e5"] { stroke: #b388ff; }
 .copyable { display: inline-block; margin: 0; padding: 4px 8px; border: 1px dashed #3f6a52; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
 .copyable::after { content: "  copy"; opacity: 0.7; }
 .map-label div { font-size: calc(var(--label-px, 16px) * var(--label-scale, 1)); }
-.map-label.anchor-n { transform: translate(-50%, 4px); }
+.map-label.anchor-n div { transform: translate(-50%, 4px); }
 .leaflet-container.labels-hidden .map-label { display: none; }

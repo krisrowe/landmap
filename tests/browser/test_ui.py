@@ -202,6 +202,11 @@ def test_tap_a_spot_and_teleport_there(server, page):
     walking at home moves you around the land, survives a reload, and ends from the toolbar."""
     page.goto(server + "/")
     page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
+    assert page.evaluate("""(() => {
+      const m = document.querySelector('.map-label.anchor-n'); const t = m.firstElementChild;
+      const a = m.getBoundingClientRect(), b = t.getBoundingClientRect();
+      return Math.abs((b.left + b.right) / 2 - a.left) < 2 && b.top >= a.top;   // centred on the anchor, hanging below it
+    })()""")
     page.mouse.click(210, 350)                                            # a spot inside the 40, off the labels
     page.wait_for_selector("#spot-sheet:not([hidden])", timeout=5000)
     assert "40 acres" in page.text_content("#spot-in")                    # the sheet says what the spot is in
