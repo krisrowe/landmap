@@ -53,7 +53,7 @@ def page(server):
         if os.environ.get("PLAYWRIGHT_CHROMIUM"):
             launch["executable_path"] = os.environ["PLAYWRIGHT_CHROMIUM"]
         browser = p.chromium.launch(**launch)
-        ctx = browser.new_context(geolocation=FIX, permissions=["geolocation"],
+        ctx = browser.new_context(geolocation=FIX, permissions=["geolocation", "clipboard-read", "clipboard-write"],
                                   viewport={"width": 420, "height": 800}, is_mobile=True, has_touch=True)
         # Map tiles come from the internet; keep the test hermetic and fast.
         ctx.route("**/arcgisonline.com/**", lambda r: r.abort())
@@ -205,6 +205,9 @@ def test_tap_a_spot_and_teleport_there(server, page):
     page.wait_for_selector("#spot-sheet:not([hidden])", timeout=5000)
     assert page.is_hidden("#spot-pin") == page.is_hidden("#btn-pin")      # pinning offered only when signed in
     tapped = [float(v) for v in page.text_content("#spot-fix").split(",")]
+    page.click("#spot-fix")                                               # the coordinates line copies itself
+    page.wait_for_function("document.querySelector('#status').textContent.startsWith('Copied')", timeout=5000)
+    assert page.evaluate("navigator.clipboard.readText()") == page.text_content("#spot-fix")
     page.click("#spot-teleport")
     page.wait_for_function("document.querySelector('#status').textContent.includes('now at the spot')", timeout=15000)
     here = [float(v) for v in page.evaluate("document.body.dataset.here").split(",")]

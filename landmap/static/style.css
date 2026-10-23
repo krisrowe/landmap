@@ -67,3 +67,5 @@ html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Se
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(224,168,46,0.7); } 50% { box-shadow: 0 0 0 10px rgba(224,168,46,0); } }
 #toolbar button.teleport { background: #5a3d8a; outline: 2px solid #b388ff; }
 body.teleported path[stroke="#1e88e5"] { stroke: #b388ff; }
+.copyable { display: inline-block; margin: 0; padding: 4px 8px; border: 1px dashed #3f6a52; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.copyable::after { content: "  copy"; opacity: 0.7; }

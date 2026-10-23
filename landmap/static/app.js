@@ -92,6 +92,17 @@
   }
 
   function fmtAccuracy(m) { return m == null ? "" : `±${Math.round(m)} m`; }
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      }
+      showStatus(`Copied ${text}`);
+    } catch (e) { showStatus("Copy failed: " + e.message); }
+  }
 
   function renderPin(pin, pending) {
     let marker = markers.get(pin.id);
@@ -115,7 +126,8 @@
     return `<strong>${escapeHtml(pin.label)}</strong>${pending ? " <em>(not yet saved)</em>" : ""}<br>` +
       `<span class="muted">${pin.lat.toFixed(6)}, ${pin.lng.toFixed(6)} ${fmtAccuracy(pin.accuracy)}<br>${when}</span>` +
       (pin.note ? `<p>${escapeHtml(pin.note)}</p>` : "") +
-      (pending ? "" : `<div class="popup-actions"><button data-act="edit">Edit</button><button data-act="delete" class="danger">Delete</button></div>`);
+      `<div class="popup-actions"><button data-act="copy">Copy</button>` +
+      (pending ? "" : `<button data-act="edit">Edit</button><button data-act="delete" class="danger">Delete</button>`) + `</div>`;
   }
 
   function wirePopup(popup, pin) {
@@ -123,6 +135,7 @@
     if (!el) return;
     el.querySelectorAll("button[data-act]").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (btn.dataset.act === "copy") { copyText(`${pin.lat.toFixed(6)}, ${pin.lng.toFixed(6)}`); return; }
         if (btn.dataset.act === "delete") {
           if (!window.confirm(`Delete "${pin.label}"?`)) return;
           try {
@@ -489,6 +502,7 @@
   });
   map.on("contextmenu", (e) => openSpot(e.latlng));
   $("spot-cancel").addEventListener("click", closeSpot);
+  $("spot-fix").addEventListener("click", () => { if (spot) copyText(`${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}`); });
   $("spot-pin").addEventListener("click", () => {
     const at = spot; closeSpot();
     openSheet({ title: "New pin at this spot", label: "", note: "", fix: `${at.lat.toFixed(6)}, ${at.lng.toFixed(6)}` },
