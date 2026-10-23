@@ -194,3 +194,32 @@ def test_locate_far_from_the_property_stays_put(server, page):
         assert pg.is_hidden("#sheet")
     finally:
         far.close()
+
+
+def test_tap_a_spot_and_teleport_there(server, page):
+    """Tapping the map offers Pin here / Put me here; Put me here shifts every GPS reading so
+    walking at home moves you around the land, survives a reload, and ends from the toolbar."""
+    page.goto(server + "/")
+    page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
+    page.mouse.click(210, 300)                                            # a spot on the land, off the centre label
+    page.wait_for_selector("#spot-sheet:not([hidden])", timeout=5000)
+    assert page.is_hidden("#spot-pin") == page.is_hidden("#btn-pin")      # pinning offered only when signed in
+    tapped = [float(v) for v in page.text_content("#spot-fix").split(",")]
+    page.click("#spot-teleport")
+    page.wait_for_function("document.querySelector('#status').textContent.includes('now at the spot')", timeout=15000)
+    here = [float(v) for v in page.evaluate("document.body.dataset.here").split(",")]
+    assert abs(here[0] - tapped[0]) < 1e-5 and abs(here[1] - tapped[1]) < 1e-5   # you are where you tapped, not at FIX
+    assert page.is_visible("#btn-teleport")
+
+    page.context.set_geolocation({"latitude": FIX["latitude"] + 0.0010, "longitude": FIX["longitude"], "accuracy": 3.0})
+    page.wait_for_function(f"Math.abs(parseFloat(document.body.dataset.here.split(',')[0]) - {tapped[0] + 0.0010}) < 2e-5", timeout=15000)
+    here = [float(v) for v in page.evaluate("document.body.dataset.here").split(",")]
+    assert abs(here[1] - tapped[1]) < 1e-5                                 # moved north only, same ground distance
+
+    page.reload()
+    page.wait_for_selector(".leaflet-overlay-pane path", timeout=15000)
+    assert page.is_visible("#btn-teleport")                               # still teleported after a reload
+    page.click("#btn-teleport")
+    page.wait_for_function("document.querySelector('#status').textContent.includes('Back to your real position')", timeout=5000)
+    assert page.is_hidden("#btn-teleport")
+    page.context.set_geolocation(FIX)

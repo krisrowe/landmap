@@ -25,6 +25,7 @@
 
 <div id="toolbar">
   <button id="btn-locate" title="Show where I am">Locate</button>
+  <button id="btn-teleport" class="teleport" title="Stop pretending to be at the tapped spot" hidden>Teleported · end</button>
   <button id="btn-pin" class="primary" title="Pin the spot I am standing on" hidden>Pin here</button>
 </div>
 <div id="status" hidden></div>
@@ -39,6 +40,16 @@
       <button type="submit" class="primary">Sign in</button>
     </div>
   </form>
+</div>
+
+<div id="spot-sheet" hidden>
+  <h2>This spot</h2>
+  <p id="spot-fix" class="muted"></p>
+  <div class="row">
+    <button type="button" id="spot-cancel">Cancel</button>
+    <button type="button" id="spot-teleport">Put me here</button>
+    <button type="button" id="spot-pin" class="primary">Pin here</button>
+  </div>
 </div>
 
 <div id="sheet" hidden>

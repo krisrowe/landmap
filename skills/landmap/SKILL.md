@@ -28,6 +28,14 @@ land is **data outside the repo**.
   Hand it over as a `?key=` link or from the deployment's secret store;
   never paste it into a chat or a file in the repo.
 
+## Test the GPS features from anywhere
+
+Tap a spot on the map and choose Put me here. Every GPS reading is then
+shifted so that spot stands for where you really are; walking around moves
+you around the land, and Locate and Pin here behave as they would on site.
+The toolbar shows a Teleported button while it is on; tap it to end. Pins
+saved while teleported are real pins at the shifted position.
+
 ## Run locally
 
 ```bash

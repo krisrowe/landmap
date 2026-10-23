@@ -318,6 +318,63 @@
   let hereMarker = null, hereCircle = null, follow = false;
   let lastFix = null;
 
+  // ---- Teleport: be somewhere else -----------------------------------------
+  // "Put me here" anchors your real position to a tapped spot. From then on every
+  // GPS reading is shifted by the same ground distance (metres east and north,
+  // scaled at each latitude), so walking around at home moves you around the
+  // land. Everything downstream (Locate, Pin here, future tracks) sees the
+  // shifted reading and nothing else, which is what makes it a test of the real
+  // thing. Survives a reload; ended from the toolbar.
+  const TELEPORT_KEY = "landmap.teleport";
+  let teleport = null;
+  try { teleport = JSON.parse(localStorage.getItem(TELEPORT_KEY) || "null"); } catch (e) { teleport = null; }
+  const M_PER_DEG = 111320;
+  function translate(pos) {
+    if (!teleport) return pos;
+    const c = pos.coords;
+    const east = (c.longitude - teleport.real.lng) * M_PER_DEG * Math.cos(teleport.real.lat * Math.PI / 180);
+    const north = (c.latitude - teleport.real.lat) * M_PER_DEG;
+    const lat = teleport.map.lat + north / M_PER_DEG;
+    const lng = teleport.map.lng + east / (M_PER_DEG * Math.cos(teleport.map.lat * Math.PI / 180));
+    return { coords: { latitude: lat, longitude: lng, accuracy: c.accuracy, heading: c.heading, speed: c.speed },
+             timestamp: pos.timestamp, teleported: true };
+  }
+  function setTeleport(value) {
+    teleport = value;
+    try { value ? localStorage.setItem(TELEPORT_KEY, JSON.stringify(value)) : localStorage.removeItem(TELEPORT_KEY); } catch (e) { /* fine */ }
+    $("btn-teleport").hidden = !value;
+    document.body.classList.toggle("teleported", !!value);
+  }
+  function realFix() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("No GPS available"));
+      navigator.geolocation.getCurrentPosition(resolve, (err) => reject(new Error(err.message)),
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+    });
+  }
+  async function teleportTo(latlng) {
+    showStatus("Getting your real position…", true);
+    try {
+      const fix = await realFix();
+      setTeleport({ real: { lat: fix.coords.latitude, lng: fix.coords.longitude }, map: { lat: latlng.lat, lng: latlng.lng } });
+      farNotified = false;
+      updateHere(translate(fix));
+      follow = true; $("btn-locate").classList.add("active");
+      startWatch();
+      map.setView([latlng.lat, latlng.lng], Math.max(map.getZoom(), 17));
+      showStatus("You're now at the spot you tapped. Walk around and the map follows; end it from the toolbar.");
+    } catch (err) { showStatus("GPS: " + err.message); }
+  }
+  function endTeleport() {
+    setTeleport(null);
+    farNotified = false;
+    if (hereMarker) { map.removeLayer(hereMarker); map.removeLayer(hereCircle); hereMarker = hereCircle = null; }
+    follow = false; $("btn-locate").classList.remove("active");
+    showStatus("Back to your real position");
+  }
+  $("btn-teleport").addEventListener("click", endTeleport);
+  setTeleport(teleport);
+
   function insideRegion(lat, lng) {
     const region = map.options.maxBounds;
     return !region || region.contains([lat, lng]);
@@ -339,6 +396,7 @@
   function updateHere(pos) {
     const ll = [pos.coords.latitude, pos.coords.longitude];
     lastFix = pos;
+    document.body.dataset.here = `${ll[0].toFixed(6)},${ll[1].toFixed(6)}`;
     if (!insideRegion(ll[0], ll[1])) {
       // Far from the land (home, the road in): the map stays on the property.
       if (!farNotified) { showStatus(farAwayMessage(ll[0], ll[1])); farNotified = true; }
@@ -359,7 +417,7 @@
   function startWatch() {
     if (!navigator.geolocation) { showStatus("No GPS available in this browser"); return; }
     if (watchId !== null) return;
-    watchId = navigator.geolocation.watchPosition(updateHere,
+    watchId = navigator.geolocation.watchPosition((pos) => updateHere(translate(pos)),
       (err) => showStatus("GPS: " + err.message),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
   }
@@ -381,7 +439,8 @@
       if (!navigator.geolocation) return reject(new Error("No GPS available"));
       // Start from the fix Locate already has, if it is fresh; readings only improve on it.
       let best = (lastFix && Date.now() - lastFix.timestamp < 15000) ? lastFix : null;
-      const id = navigator.geolocation.watchPosition((pos) => {
+      const id = navigator.geolocation.watchPosition((raw) => {
+        const pos = translate(raw);
         updateHere(pos);
         if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
         showStatus(`Getting GPS fix… ${fmtAccuracy(best.coords.accuracy)}`, true);
@@ -405,18 +464,37 @@
         showStatus(farAwayMessage(c.latitude, c.longitude) + "; pins are for when you're on the land");
         return;
       }
-      openSheet({ title: "New pin", label: "", note: "", fix: `${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)} ${fmtAccuracy(c.accuracy)}` },
+      openSheet({ title: fix.teleported ? "New pin (teleported position)" : "New pin", label: "", note: "",
+                  fix: `${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)} ${fmtAccuracy(c.accuracy)}` },
         (values) => savePin({ label: values.label, note: values.note, lat: c.latitude, lng: c.longitude, accuracy: c.accuracy }));
     } catch (err) {
       showStatus("GPS: " + err.message);
     } finally { btn.disabled = false; }
   });
 
-  // Long-press / right-click on the map pins an arbitrary spot (planning from the couch).
-  map.on("contextmenu", (e) => {
-    openSheet({ title: "New pin at this spot", label: "", note: "", fix: `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}` },
-      (values) => savePin({ label: values.label, note: values.note, lat: e.latlng.lat, lng: e.latlng.lng, accuracy: null }));
+  // Tap (or long-press) a spot on the map: pin it, or put yourself there.
+  let spot = null;
+  function openSpot(latlng) {
+    spot = latlng;
+    $("spot-fix").textContent = `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+    $("spot-pin").hidden = !signedIn;
+    $("spot-teleport").textContent = teleport ? "Move me here" : "Put me here";
+    $("spot-sheet").hidden = false;
+  }
+  function closeSpot() { $("spot-sheet").hidden = true; spot = null; }
+  map.on("click", (e) => {
+    if (!$("sheet").hidden || !$("signin-sheet").hidden) return;
+    if (!$("spot-sheet").hidden) { closeSpot(); return; }
+    openSpot(e.latlng);
   });
+  map.on("contextmenu", (e) => openSpot(e.latlng));
+  $("spot-cancel").addEventListener("click", closeSpot);
+  $("spot-pin").addEventListener("click", () => {
+    const at = spot; closeSpot();
+    openSheet({ title: "New pin at this spot", label: "", note: "", fix: `${at.lat.toFixed(6)}, ${at.lng.toFixed(6)}` },
+      (values) => savePin({ label: values.label, note: values.note, lat: at.lat, lng: at.lng, accuracy: null }));
+  });
+  $("spot-teleport").addEventListener("click", () => { const at = spot; closeSpot(); teleportTo(at); });
 
   // ---- Bottom sheet ----------------------------------------------------------
   let sheetSubmit = null;

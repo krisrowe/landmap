@@ -7,11 +7,11 @@ html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Se
   display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   background: rgba(31, 59, 45, 0.92); backdrop-filter: blur(6px);
 }
-#toolbar button, #sheet .row button, #signin-sheet .row button {
+#toolbar button, #sheet .row button, #signin-sheet .row button, #spot-sheet .row button {
   flex: 1; padding: 14px 10px; font-size: 16px; border: 0; border-radius: 10px;
   background: #2f5440; color: var(--fg); cursor: pointer;
 }
-#toolbar button.primary, #sheet button.primary, #signin-sheet button.primary { background: var(--accent); color: #221a05; font-weight: 600; }
+#toolbar button.primary, #sheet button.primary, #signin-sheet button.primary, #spot-sheet button.primary { background: var(--accent); color: #221a05; font-weight: 600; }
 #toolbar button.active { outline: 2px solid var(--accent); }
 #toolbar button:disabled { opacity: 0.5; }
 #status {
@@ -35,18 +35,18 @@ html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Se
   background: rgba(31, 59, 45, 0.96); box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 #menu button { padding: 12px 16px; font-size: 15px; border: 0; border-radius: 8px; background: #2f5440; color: var(--fg); text-align: left; cursor: pointer; }
-#sheet, #signin-sheet {
+#sheet, #signin-sheet, #spot-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100;
   background: var(--bg); color: var(--fg); border-radius: 16px 16px 0 0;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
 }
-#sheet h2, #signin-sheet h2 { margin: 0 0 4px; font-size: 18px; }
+#sheet h2, #signin-sheet h2, #spot-sheet h2 { margin: 0 0 4px; font-size: 18px; }
 #sheet label, #signin-sheet label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
 #sheet input, #sheet textarea, #signin-sheet input {
   width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; border-radius: 8px;
   border: 1px solid #3f6a52; background: #142a1f; color: var(--fg);
 }
-#sheet .row, #signin-sheet .row { display: flex; gap: 8px; margin-top: 14px; }
+#sheet .row, #signin-sheet .row, #spot-sheet .row { display: flex; gap: 8px; margin-top: 14px; }
 .muted { color: var(--muted); font-size: 13px; margin: 0; }
 .pin-label { background: rgba(31,59,45,0.9); color: var(--fg); border: 0; border-radius: 6px; padding: 2px 6px; font-weight: 600; box-shadow: none; }
 .pin-label::before { display: none; }
@@ -65,3 +65,5 @@ html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Se
 .map-label { background: none; border: 0; font-weight: 600; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; line-height: 1.15; transform: translate(-50%, -50%); }
 #btn-home.away { background: var(--accent); color: #221a05; animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(224,168,46,0.7); } 50% { box-shadow: 0 0 0 10px rgba(224,168,46,0); } }
+#toolbar button.teleport { background: #5a3d8a; outline: 2px solid #b388ff; }
+body.teleported path[stroke="#1e88e5"] { stroke: #b388ff; }

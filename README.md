@@ -52,7 +52,13 @@ the definition names but the folder lacks, and prints the extent.
 - **Pin here** listens to the GPS for a few seconds, keeps the most accurate
   reading, and saves it with a label and optional note. Pins render as
   labeled markers; tap one to edit or delete it.
-- Right-click or long-press anywhere on the map to pin a spot by hand.
+- Tap anywhere on the map and it asks what you want there: **Pin here** (by
+  hand, no GPS) or **Put me here**. Put me here anchors your real position to
+  that spot: from then on every GPS reading is shifted by the same ground
+  distance, so walking around your own neighborhood moves you around the land.
+  Locate, Pin here, and everything else see the shifted position, which makes
+  it a real test of the GPS features from anywhere. It survives a reload and
+  ends from the toolbar.
 - **Offline map** (in the menu) pre-downloads the imagery tiles around the
   boundary so the map still renders without cell signal; pins made offline
   queue in the browser and sync when a connection returns.

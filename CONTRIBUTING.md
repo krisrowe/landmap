@@ -27,6 +27,12 @@ more. There is no user model and none is planned.
 the property; Locate far away reports distance and direction instead of
 flying there; Home always returns. Keep that contract when adding features.
 
+**One position source, optionally shifted.** Every GPS reading enters through
+one translation function before anything consumes it. Teleport works by
+setting that function's anchor; nothing else knows it exists, so a feature
+tested while teleported is the same code path as on the land. Keep new GPS
+consumers (tracks, anything else) behind the same function.
+
 **Nothing built lands in the tree.** No bundlers, no generated files; the
 page is plain files under `landmap/static/` with Leaflet vendored.
 
