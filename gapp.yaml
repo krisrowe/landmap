@@ -1,5 +1,3 @@
-service:
-  entrypoint: landmap.server:app
 public: true
 env:
 - name: LANDMAP_DATA_PATH
